@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+from scipy.stats import gamma
 
 # Part 1 : Computation of average search delays , rel;ative entropy distance per neuron and l1 distance per neuron
 
@@ -24,7 +25,7 @@ for i in range(0,18,2):
     average = sum_pairs.mean()
     average_search_delays.append(average)
 
-# print(average_search_delays)
+print(average_search_delays)
 
 # relative entropy distances and l1 distances
 firing_rates_db_new = firing_rates_db.loc[3:]
@@ -92,4 +93,68 @@ print(f"Error for Entropy : {mse1} and Error for L1 : {mse2}")
 
 
 # 3. Fitting a Gamma distribution to the search delays.
+
+# part 3 a
+column_indices = np.random.choice(np.arange(18),size=9,replace=False)
+mean_search_delays = []
+std_search_delays = []
+for idx in column_indices:
+    column = search_times_db_new.iloc[:,idx]
+    column = column.to_numpy()
+    column = column - 328
+    mean_search_delays.append(np.mean(column))
+    std_search_delays.append(np.std(column))
+
+mean_search_delays_np = np.array(mean_search_delays)
+std_search_delays_np = np.array(std_search_delays)
+model3 = LinearRegression()
+model3.fit(mean_search_delays_np.reshape(-1,1),std_search_delays_np)
+std_search_delay_predicted = model3.predict(mean_search_delays_np.reshape(-1,1))
+plt.scatter(mean_search_delays_np,std_search_delays_np,color='Blue',label='Data points')
+plt.plot(mean_search_delays_np,std_search_delay_predicted,color='red',label='Fitted line')
+plt.xlabel('Mean Search Delays')
+plt.ylabel('Standard Deviation Search Delays')
+plt.title('Part 3 a')
+plt.show()
+
+shape_parameter = (model3.coef_[0])**2
+print(f"Shape parameter a : {shape_parameter}")
+
+# part b
+column_indices_not_present = []
+samples_for_rate_estimation = []
+search_delays = []
+for i in range(18):
+    if i not in column_indices:
+        column_indices_not_present.append(i)
+
+for idx in column_indices_not_present:
+    column = search_times_db_new.iloc[:,idx]
+    column = column.dropna().to_numpy()
+    n = len(column)
+    samples = np.random.choice(column , size=n//2 , replace=False)
+    unsampled = list(set(column) - set(samples))
+    samples_for_rate_estimation.extend(samples)
+    search_delays.extend(unsampled)
+rate_samples = np.array(samples_for_rate_estimation)
+mean_rate_samples = np.mean(rate_samples)
+rate_parameter = shape_parameter/mean_rate_samples
+print(f"Rate parameter : {rate_parameter}")
+
+# part c
+
+search_delays = np.sort(np.array(search_delays)) 
+empirical_cdf = np.arange(1, len(search_delays) + 1) / len(search_delays)
+gamma_cdf = gamma.cdf(search_delays, a=shape_parameter, scale=1/rate_parameter)
+ks_statistic = np.max(np.abs(empirical_cdf - gamma_cdf))
+plt.step(search_delays,empirical_cdf,label='Empirical CDF',color='red')
+plt.plot(search_delays,gamma_cdf,label='Gamma CDF',color='blue')
+plt.xlabel('Search delays')
+plt.ylabel('CDF (Empirical and Gamma)')
+plt.title('Empirical vs Gamma CDF')
+plt.legend()
+plt.grid(False)
+plt.show()
+
+
 
